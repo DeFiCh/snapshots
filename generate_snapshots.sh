@@ -1,5 +1,5 @@
 #!/bin/bash
-# set -Eeuo pipefail
+set -Eeuo pipefail
 
 setup_vars() {
     # Define bins
@@ -12,9 +12,7 @@ setup_vars() {
     GS_BUCKET=gs://team-drop
     GCP_DATADIR_FOLDER=${GCP_DATADIR_FOLDER:-"master-datadir-tmp"}
     DATADIR_FOLDER=$GS_BUCKET/$GCP_DATADIR_FOLDER
-    LOG_FOLDER=$GCP_DATADIR_FOLDER/logs
-
-    GENERATE_LOG=${GENERATE_LOG:-"1"}
+    GREP=${GREP:-"grep"}
 
     # Define commands
     DEFID_CMD="$DEFID_BIN -datadir=$DATADIR -daemon -debug=accountchange -spv=1"
@@ -50,24 +48,13 @@ start_node () {
     sleep 60
 }
 
-create_log_file () {
-    echo "Output log to $TMP_LOG file"
-    grep "AccountChange:" $DEBUG_FILE | cut -d" " -f2- > $TMP_LOG
-    $DEFI_CLI_CMD logaccountbalances >> $TMP_LOG
-    $DEFI_CLI_CMD spv_listanchors >> $TMP_LOG
-    $DEFI_CLI_CMD logstoredinterests >> $TMP_LOG
-    $DEFI_CLI_CMD listvaults '{"verbose": true}' '{"limit":1000000}' >> $TMP_LOG
-    $DEFI_CLI_CMD listtokens '{"limit":1000000}' >> $TMP_LOG
-    $DEFI_CLI_CMD getburninfo >> $TMP_LOG
-}
-
 create_snapshot () {
     echo "Creating snapshot $TMP_DATADIR"
     # Using different port and rpc_port lest it conflicts with main defid process
     PORT=99$(printf "%02d\n" $I)
     RPC_PORT=89$(printf "%02d\n" $I)
 
-    TMP_DATADIR=datadir-$TARGET_BLOCK.tar.gz
+    TARBALL=datadir-$TARGET_BLOCK.tar.gz
 
     # Restarts defid on another port with -connect=0 to reconsider block invalidated by interrupt-block flag
     $DEFID_BIN -daemon -datadir=$TMPDIR -connect=0 -rpcport=$RPC_PORT -port=$PORT
@@ -80,12 +67,12 @@ create_snapshot () {
 
     rm $TMPDIR/*
     rm -rf $TMPDIR/wallets
-    cd $TMPDIR && tar -czvf ../$TMP_DATADIR $(ls) && cd ..
+    cd $TMPDIR && tar -czvf ../$TARBALL $(ls) && cd ..
     rm -rf $TMPDIR
 
     # upload snapshot to GCP
-    gsutil cp $TMP_DATADIR $DATADIR_FOLDER/$TMP_DATADIR
-    rm $TMP_DATADIR
+    gsutil cp $TARBALL $DATADIR_FOLDER/$TARBALL
+    rm $TARBALL
 
     I=$(($I + 1))
 }
@@ -108,7 +95,7 @@ main() {
         echo "CURRENT_BLOCK : $CURRENT_BLOCK"
         echo "TIP_HEIGHT : $TIP_HEIGHT"
 
-        if [ "$CURRENT_BLOCK" -eq "$TMP_BLOCK" ] && [ "$CURRENT_BLOCK" -neq "$TIP_HEIGHT" ]; then
+        if [ "$CURRENT_BLOCK" -eq "$TMP_BLOCK" ] && [ "$CURRENT_BLOCK" -ne "$TIP_HEIGHT" ]; then
             ATTEMPTS=$((ATTEMPTS + 1))
         else
             ATTEMPTS=0
@@ -132,14 +119,6 @@ main() {
 
         if [ $CURRENT_BLOCK -eq $TARGET_BLOCK ]; then
             echo "AT TARGET_BLOCK : $TARGET_BLOCK"
-
-            if [[ $GENERATE_LOG == "1" ]]; then
-                TMP_LOG=debug-$TARGET_BLOCK.log
-                create_log_file
-
-                # Upload log file to GCP
-                gsutil cp $TMP_LOG $LOG_FOLDER/$TMP_LOG &
-            fi
 
             $DEFI_CLI_CMD stop
             sleep 60
