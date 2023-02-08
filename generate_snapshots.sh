@@ -7,7 +7,7 @@ setup_vars() {
     DEFI_CLI_BIN=${DEFI_CLI_BIN:-"defi-cli"}
 
     # Define files and directories
-    DATADIR=${DATADIR:-".defi"}
+    DATADIR=${DATADIR:-"$HOME/.defi"}
     DEBUG_FILE="$DATADIR/debug.log"
     GS_BUCKET=gs://team-drop
     GCP_DATADIR_FOLDER=${GCP_DATADIR_FOLDER:-"master-datadir-tmp"}
@@ -16,16 +16,6 @@ setup_vars() {
 
     # Define commands
     DEFID_CMD="$DEFID_BIN -datadir=$DATADIR -daemon -debug=accountchange -spv=1"
-
-    if [[ $WITH_CHECKPOINTS == "1" ]]; then
-        CHECKPOINTS_FILE=${CHECKPOINTS_FILE:-"checkpoints.txt"}
-        DEFID_CMD+= " -checkpoints-file=$CHECKPOINTS_FILE"
-    fi
-
-    if [[ $PRUNE == "1" ]]; then
-        PRUNE_SIZE=${PRUNE_SIZE:-550}
-        DEFID_CMD+= " -prune=$PRUNE_SIZE"
-    fi
 
     DEFI_CLI_CMD="$DEFI_CLI_BIN -datadir=$DATADIR"
 
@@ -49,12 +39,12 @@ start_node () {
 }
 
 create_snapshot () {
-    echo "Creating snapshot $TMP_DATADIR"
     # Using different port and rpc_port lest it conflicts with main defid process
     PORT=99$(printf "%02d\n" $I)
     RPC_PORT=89$(printf "%02d\n" $I)
 
     TARBALL=datadir-$TARGET_BLOCK.tar.gz
+    echo "Creating snapshot $TARBALL"
 
     # Restarts defid on another port with -connect=0 to reconsider block invalidated by interrupt-block flag
     $DEFID_BIN -daemon -datadir=$TMPDIR -connect=0 -rpcport=$RPC_PORT -port=$PORT
@@ -65,14 +55,14 @@ create_snapshot () {
     $DEFI_CLI_BIN -datadir=$TMPDIR -rpcport=$RPC_PORT stop
     sleep 60
 
-    rm $TMPDIR/*
+    find $TMPDIR/* -maxdepth 1 -type f -delete
     rm -rf $TMPDIR/wallets
     cd $TMPDIR && tar -czvf ../$TARBALL $(ls) && cd ..
     rm -rf $TMPDIR
 
     # upload snapshot to GCP
-    gsutil cp $TARBALL $DATADIR_FOLDER/$TARBALL
-    rm $TARBALL
+    # gsutil cp $TARBALL $DATADIR_FOLDER/$TARBALL
+    # rm $TARBALL
 
     I=$(($I + 1))
 }
@@ -121,17 +111,19 @@ main() {
             echo "AT TARGET_BLOCK : $TARGET_BLOCK"
 
             $DEFI_CLI_CMD stop
+
+            pkill defid-init
             sleep 60
 
             # Remove all files that should not be added to snapshot
-            rm .defi/*
-            rm -rf .defi/wallets
+            find $DATADIR -maxdepth 1 -type f -delete
+            rm -rf $DATADIR/wallets
 
             # Create backup before generating snapshot
             TMPDIR="tmpdir-$TARGET_BLOCK"
-            cp -r .defi $TMPDIR
+            cp -r $DATADIR $TMPDIR
 
-            create_snapshot &
+            create_snapshot
 
             # Restart node and set interrupt to next block range
             TARGET_BLOCK=$(($TARGET_BLOCK + $BLOCK_RANGE))
@@ -139,7 +131,7 @@ main() {
             sleep 60
             reconsider_latest_block
         else
-            sleep 60
+            sleep 1
         fi
     done
 }
