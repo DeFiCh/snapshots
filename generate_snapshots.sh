@@ -112,7 +112,6 @@ main() {
 
             $DEFI_CLI_CMD stop
 
-            pkill defid-init
             sleep 60
 
             # Remove all files that should not be added to snapshot
@@ -123,7 +122,7 @@ main() {
             TMPDIR="tmpdir-$TARGET_BLOCK"
             cp -r $DATADIR $TMPDIR
 
-            create_snapshot
+            create_snapshot &
 
             # Restart node and set interrupt to next block range
             TARGET_BLOCK=$(($TARGET_BLOCK + $BLOCK_RANGE))
