@@ -30,6 +30,8 @@ setup_vars() {
     MAX_ATTEMPTS=3
     MAX_NODE_RESTARTS=5
     NODE_RESTARTS=0
+
+    AIN_REPO_URL="https://github.com/DeFiCh/ain.git"
 }
 
 start_node () {
@@ -72,8 +74,23 @@ reconsider_latest_block () {
     $DEFI_CLI_CMD clearbanned
 }
 
+build_from_scratch () {
+    cd /tmp
+    git clone $AIN_REPO_URL
+    cd ain
+    git checkout $1
+    ./contrib/install_db4.sh `pwd`
+    ./autogen.sh
+    ./configure BDB_LIBS="-L${BDB_PREFIX}/lib -ldb_cxx-5.3" BDB_CFLAGS="-I${BDB_PREFIX}/include"
+    make -j "$(($(nproc)))"
+    export PATH=$PATH:`pwd`/src/
+}
+
 main() {
     setup_vars
+    if [[ $# -eq 1 ]] ; then
+        build_from_scratch "$@"
+    fi
     start_node
     I=0
 
