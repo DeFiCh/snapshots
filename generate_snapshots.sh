@@ -79,10 +79,7 @@ build_from_scratch () {
     git clone $AIN_REPO_URL
     cd ain
     git checkout $1
-    ./contrib/install_db4.sh `pwd`
-    ./autogen.sh
-    ./configure BDB_LIBS="-L${BDB_PREFIX}/lib -ldb_cxx-5.3" BDB_CFLAGS="-I${BDB_PREFIX}/include"
-    make -j "$(($(nproc)))"
+    ./make.sh build
     export PATH=$PATH:`pwd`/src/
 }
 
