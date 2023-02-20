@@ -78,16 +78,28 @@ build_from_scratch () {
     cd /tmp
     git clone $AIN_REPO_URL
     cd ain
-    git checkout $1
+    git checkout $COMMIT
     ./make.sh build
     export PATH=$PATH:`pwd`/src/
 }
 
+get_args () {
+    while getopts c:d:t: flag
+    do
+        case "${flag}" in
+            c) COMMIT=${OPTARG};;
+            d) DEFID_BIN=${OPTARG};;
+            t) TARGET_BLOCK=${OPTARG};;
+        esac
+    done
+    if [ -n "${COMMIT+set}" ]; then
+        build_from_scratch
+    fi
+}
+
 main() {
     setup_vars
-    if [[ $# -eq 1 ]] ; then
-        build_from_scratch "$@"
-    fi
+    get_args "$@"
     start_node
     I=0
 
