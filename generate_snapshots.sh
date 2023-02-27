@@ -37,6 +37,15 @@ start_node () {
     sleep 60
 }
 
+export_snapshot() {
+    if [ -n "${LOCAL_PATH+set}" ]; then
+        cp $TARBALL $LOCAL_PATH
+    else
+        # upload snapshot to GCP
+        gsutil cp $TARBALL "$DATADIR_FOLDER"/$TARBALL
+    fi
+}
+
 create_snapshot () {
     # Using different port and rpc_port lest it conflicts with main defid process
     PORT=99$(printf "%02d\n" $I)
@@ -61,8 +70,7 @@ create_snapshot () {
     cd $TMPDIR && tar -czvf ../$TARBALL $(ls) && cd ..
     rm -rf $TMPDIR
 
-    # upload snapshot to GCP
-    gsutil cp $TARBALL "$DATADIR_FOLDER"/$TARBALL
+    export_snapshot
     rm $TARBALL
 
     I=$((I + 1))
@@ -84,12 +92,13 @@ build_from_scratch () {
 }
 
 get_args () {
-    while getopts c:d:r: flag
+    while getopts c:d:r:l: flag
     do
         case "${flag}" in
             c) COMMIT=${OPTARG};;
             d) DEFID_BIN=${OPTARG};;
             r) BLOCK_RANGE=${OPTARG};;
+            l) LOCAL_PATH=${OPTARG};;
             *) ;;
         esac
     done
