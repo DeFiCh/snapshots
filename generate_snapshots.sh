@@ -61,8 +61,8 @@ create_snapshot () {
     rm -rf $TMPDIR
 
     # upload snapshot to GCP
-    # gsutil cp $TARBALL $DATADIR_FOLDER/$TARBALL
-    # rm $TARBALL
+    gsutil cp $TARBALL $DATADIR_FOLDER/$TARBALL
+    rm $TARBALL
 
     I=$(($I + 1))
 }
