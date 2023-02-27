@@ -9,7 +9,7 @@ setup_vars() {
     # Define files and directories
     DATADIR=${DATADIR:-"$HOME/.defi"}
     GS_BUCKET=gs://team-drop
-    GCP_DATADIR_FOLDER=${GCP_DATADIR_FOLDER:-"master-datadir-tmp"}
+    GCP_DATADIR_FOLDER=${GCP_DATADIR_FOLDER:-"ain"}
     DATADIR_FOLDER=$GS_BUCKET/$GCP_DATADIR_FOLDER
     GREP=${GREP:-"grep"}
 
@@ -42,7 +42,9 @@ create_snapshot () {
     PORT=99$(printf "%02d\n" $I)
     RPC_PORT=89$(printf "%02d\n" $I)
 
-    TARBALL=datadir-$TARGET_BLOCK.tar.gz
+    DATADIR_FOLDER=$DATADIR_FOLDER/$VERSION
+
+    TARBALL=$TARGET_BLOCK.tar.gz
     echo "Creating snapshot $TARBALL"
 
     # Restarts defid on another port with -connect=0 to reconsider block invalidated by interrupt-block flag
@@ -101,6 +103,9 @@ get_args () {
 main() {
     setup_vars
     get_args "$@"
+    VERSION=$($DEFID_BIN -version | head -n 1)
+    VERSION=${VERSION#*version v}
+    echo "$VERSION"
     start_node
     I=0
 
