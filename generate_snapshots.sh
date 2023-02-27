@@ -8,7 +8,6 @@ setup_vars() {
 
     # Define files and directories
     DATADIR=${DATADIR:-"$HOME/.defi"}
-    DEBUG_FILE="$DATADIR/debug.log"
     GS_BUCKET=gs://team-drop
     GCP_DATADIR_FOLDER=${GCP_DATADIR_FOLDER:-"master-datadir-tmp"}
     DATADIR_FOLDER=$GS_BUCKET/$GCP_DATADIR_FOLDER
@@ -22,7 +21,7 @@ setup_vars() {
     # Define start block and block range
     BLOCK_RANGE=${BLOCK_RANGE:-50000}
     START_BLOCK=${START_BLOCK:-0}
-    TARGET_BLOCK=$(($START_BLOCK + $BLOCK_RANGE))
+    TARGET_BLOCK=$((START_BLOCK + BLOCK_RANGE))
 
     ATTEMPTS=0
     MAX_ATTEMPTS=3
@@ -47,12 +46,12 @@ create_snapshot () {
     echo "Creating snapshot $TARBALL"
 
     # Restarts defid on another port with -connect=0 to reconsider block invalidated by interrupt-block flag
-    $DEFID_BIN -daemon -datadir=$TMPDIR -connect=0 -rpcport=$RPC_PORT -port=$PORT
+    $DEFID_BIN -daemon -datadir=$TMPDIR -connect=0 -rpcport="$RPC_PORT" -port="$PORT"
     sleep 60
-    BEST_BLOCK_HASH=$($DEFI_CLI_BIN -datadir=$TMPDIR -rpcport=$RPC_PORT getbestblockhash)
+    BEST_BLOCK_HASH=$($DEFI_CLI_BIN -datadir=$TMPDIR -rpcport="$RPC_PORT" getbestblockhash)
     echo "Reconsidering block : $BEST_BLOCK_HASH"
-    $DEFI_CLI_BIN -datadir=$TMPDIR -rpcport=$RPC_PORT reconsiderblock $BEST_BLOCK_HASH
-    $DEFI_CLI_BIN -datadir=$TMPDIR -rpcport=$RPC_PORT stop
+    $DEFI_CLI_BIN -datadir=$TMPDIR -rpcport="$RPC_PORT" reconsiderblock "$BEST_BLOCK_HASH"
+    $DEFI_CLI_BIN -datadir=$TMPDIR -rpcport="$RPC_PORT" stop
     sleep 60
 
     find $TMPDIR/* -maxdepth 1 -type f -delete
@@ -61,14 +60,14 @@ create_snapshot () {
     rm -rf $TMPDIR
 
     # upload snapshot to GCP
-    gsutil cp $TARBALL $DATADIR_FOLDER/$TARBALL
+    gsutil cp $TARBALL "$DATADIR_FOLDER"/$TARBALL
     rm $TARBALL
 
-    I=$(($I + 1))
+    I=$((I + 1))
 }
 
 reconsider_latest_block () {
-    $DEFI_CLI_CMD reconsiderblock $($DEFI_CLI_CMD getbestblockhash)
+    $DEFI_CLI_CMD reconsiderblock "$($DEFI_CLI_CMD getbestblockhash)"
     $DEFI_CLI_CMD clearbanned
 }
 
@@ -76,9 +75,10 @@ build_from_scratch () {
     cd /tmp
     git clone $AIN_REPO_URL
     cd ain
-    git checkout $COMMIT
+    git checkout "$COMMIT"
     ./make.sh build
-    export PATH=$PATH:`pwd`/src/
+    PATH=$PATH:$(pwd)/src/
+    export PATH
 }
 
 get_args () {
@@ -88,12 +88,13 @@ get_args () {
             c) COMMIT=${OPTARG};;
             d) DEFID_BIN=${OPTARG};;
             r) BLOCK_RANGE=${OPTARG};;
+            *) ;;
         esac
     done
     if [ -n "${COMMIT+set}" ]; then
         build_from_scratch
     fi
-    TARGET_BLOCK=$(($START_BLOCK + $BLOCK_RANGE))
+    TARGET_BLOCK=$((START_BLOCK + BLOCK_RANGE))
     echo "Starting from START_BLOCK : $START_BLOCK to TARGET_BLOCK : $TARGET_BLOCK with BLOCK_RANGE: $BLOCK_RANGE"
 }
 
@@ -105,7 +106,7 @@ main() {
 
     while true; do
         TMP_BLOCK=${CURRENT_BLOCK:-0}
-        CURRENT_BLOCK=$($DEFI_CLI_CMD getblockcount || echo $CURRENT_BLOCK)
+        CURRENT_BLOCK=$($DEFI_CLI_CMD getblockcount || echo "$CURRENT_BLOCK")
         TIP_HEIGHT=$($DEFI_CLI_CMD getblockchaininfo | grep headers | awk '{print $2}' | sed 's/.$//')
 
         echo "CURRENT_BLOCK : $CURRENT_BLOCK"
@@ -133,7 +134,7 @@ main() {
             fi
         fi
 
-        if [ $CURRENT_BLOCK -eq $TARGET_BLOCK ]; then
+        if [ "$CURRENT_BLOCK" -eq $TARGET_BLOCK ]; then
             echo "AT TARGET_BLOCK : $TARGET_BLOCK"
 
             $DEFI_CLI_CMD stop
@@ -141,18 +142,18 @@ main() {
             sleep 60
 
             # Remove all files that should not be added to snapshot
-            find $DATADIR -maxdepth 1 -type f -delete
-            rm -rf $DATADIR/wallets
+            find "$DATADIR" -maxdepth 1 -type f -delete
+            rm -rf "$DATADIR"/wallets
 
             # Create backup before generating snapshot
             TMPDIR="tmpdir-$TARGET_BLOCK"
-            cp -r $DATADIR $TMPDIR
+            cp -r "$DATADIR" $TMPDIR
 
             create_snapshot &
 
             # Restart node and set interrupt to next block range
-            TARGET_BLOCK=$(($TARGET_BLOCK + $BLOCK_RANGE))
-            $DEFID_CMD -interrupt-block=$(($TARGET_BLOCK + 1))
+            TARGET_BLOCK=$((TARGET_BLOCK + BLOCK_RANGE))
+            $DEFID_CMD -interrupt-block=$((TARGET_BLOCK + 1))
             sleep 60
             reconsider_latest_block
         else
