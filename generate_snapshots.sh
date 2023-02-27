@@ -24,8 +24,6 @@ setup_vars() {
     START_BLOCK=${START_BLOCK:-0}
     TARGET_BLOCK=$(($START_BLOCK + $BLOCK_RANGE))
 
-    echo "Starting from START_BLOCK : $START_BLOCK to TARGET_BLOCK : $TARGET_BLOCK with BLOCK_RANGE: $BLOCK_RANGE"
-
     ATTEMPTS=0
     MAX_ATTEMPTS=3
     MAX_NODE_RESTARTS=5
@@ -84,17 +82,19 @@ build_from_scratch () {
 }
 
 get_args () {
-    while getopts c:d:t: flag
+    while getopts c:d:r: flag
     do
         case "${flag}" in
             c) COMMIT=${OPTARG};;
             d) DEFID_BIN=${OPTARG};;
-            t) TARGET_BLOCK=${OPTARG};;
+            r) BLOCK_RANGE=${OPTARG};;
         esac
     done
     if [ -n "${COMMIT+set}" ]; then
         build_from_scratch
     fi
+    TARGET_BLOCK=$(($START_BLOCK + $BLOCK_RANGE))
+    echo "Starting from START_BLOCK : $START_BLOCK to TARGET_BLOCK : $TARGET_BLOCK with BLOCK_RANGE: $BLOCK_RANGE"
 }
 
 main() {
