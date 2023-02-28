@@ -39,7 +39,7 @@ start_node () {
 
 export_snapshot() {
     if [ -n "${LOCAL_PATH+set}" ]; then
-        cp $TARBALL $LOCAL_PATH
+        cp $TARBALL "$LOCAL_PATH"
     else
         # upload snapshot to GCP
         gsutil cp $TARBALL "$DATADIR_FOLDER"/$TARBALL
