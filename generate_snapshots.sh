@@ -65,7 +65,7 @@ create_snapshot () {
     $DEFI_CLI_BIN -datadir=$TMPDIR -rpcport="$RPC_PORT" stop
     sleep 60
 
-    find $TMPDIR/* -maxdepth 1 -type f -delete
+    find "$TMPDIR" -maxdepth 1 -type f -delete
     rm -rf $TMPDIR/wallets
     cd $TMPDIR && tar -czvf ../$TARBALL $(ls) && cd ..
     rm -rf $TMPDIR
@@ -171,7 +171,7 @@ main() {
             sleep 60
             reconsider_latest_block
         else
-            sleep 1
+            sleep 60
         fi
     done
 }
